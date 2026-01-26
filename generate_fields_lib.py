@@ -154,10 +154,10 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
     power_spectrum[0, 0] = 0  # Zero mean
 
     # Scale power spectrum for FFT normalization:
-    # We want ⟨|Φ̃|²⟩ = P(ℓ) in our measurement convention
-    # Measurement: P(k) = |FFT|² * (dx*dy)² / (nx*ny)
-    # So we need: |FFT|² = P(k) * (nx*ny) / (dx*dy)²
-    scaled_power = power_spectrum * (nx * ny) / ((dx * dy)**2)
+    # Physical convention: Var(field) = ∫ C_ℓ d²ℓ / (2π)² ≈ (1/L²) Σ C_ℓ
+    # With numpy's ifft2 (divides by N²): Var(field) = Σ Var(FFT) / N⁴
+    # So we need: Var(FFT) = C_ℓ × N⁴ / L²
+    scaled_power = power_spectrum * (nx * ny)**2 / (box_size_rad**2)
 
     # Generate Hermitian-symmetric random field
     phi_fourier = generate_hermitian_random_field(nx, ny, scaled_power, rng)

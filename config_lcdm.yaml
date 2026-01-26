@@ -3,9 +3,9 @@
 
 # Grid parameters
 grid:
-  nx: 512                    # Grid size (smaller for faster generation)
+  nx: 512                    # Grid size
   ny: 512
-  box_size_deg: 10.0         # 10 degree patch
+  box_size_deg: 50.0         # 50 degree patch (2500 sq deg)
 
 # Random seed for reproducibility
 random_seed: 2024

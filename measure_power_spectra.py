@@ -58,11 +58,11 @@ def compute_power_spectrum_2d(field1, field2, box_size_deg, config):
     # Cross power spectrum in 2D
     power_2d = (fft1 * np.conj(fft2)).real
 
-    # Normalize
+    # Normalize to recover C_ℓ (consistent with generation)
     box_size_rad = box_size_deg * np.pi / 180.0
     dx = box_size_rad / nx
     dy = box_size_rad / ny
-    power_2d *= (dx * dy)**2 / (nx * ny)
+    power_2d *= box_size_rad**2 / (nx * ny)**2
 
     # Create 2D ell grid
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
@@ -156,10 +156,10 @@ def compute_spin_power_auto(field_real, box_size_deg, config, spin):
     power_B_2d = np.abs(B_fft)**2
     power_EB_2d = (E_fft * np.conj(B_fft)).real
 
-    # Normalize
-    power_E_2d *= (dx * dy)**2 / (nx * ny)
-    power_B_2d *= (dx * dy)**2 / (nx * ny)
-    power_EB_2d *= (dx * dy)**2 / (nx * ny)
+    # Normalize to recover C_ℓ
+    power_E_2d *= box_size_rad**2 / (nx * ny)**2
+    power_B_2d *= box_size_rad**2 / (nx * ny)**2
+    power_EB_2d *= box_size_rad**2 / (nx * ny)**2
 
     # Binning
     ell_min = config.get('ell_min', 10)
@@ -248,9 +248,9 @@ def compute_spin_cross(field1_scalar, field2_spin, box_size_deg, config, spin):
     power_E_2d = (fft_scalar * np.conj(E_fft)).real
     power_B_2d = (fft_scalar * np.conj(B_fft)).real
 
-    # Normalize
-    power_E_2d *= (dx * dy)**2 / (nx * ny)
-    power_B_2d *= (dx * dy)**2 / (nx * ny)
+    # Normalize to recover C_ℓ
+    power_E_2d *= box_size_rad**2 / (nx * ny)**2
+    power_B_2d *= box_size_rad**2 / (nx * ny)**2
 
     # Binning
     ell_min = config.get('ell_min', 10)
@@ -339,9 +339,9 @@ def compute_spin_spin_cross(field1_spin, field2_spin, box_size_deg, config, spin
     power_E_2d = (E1_fft * np.conj(E2_fft)).real
     power_B_2d = (B1_fft * np.conj(B2_fft)).real
 
-    # Normalize
-    power_E_2d *= (dx * dy)**2 / (nx * ny)
-    power_B_2d *= (dx * dy)**2 / (nx * ny)
+    # Normalize to recover C_ℓ
+    power_E_2d *= box_size_rad**2 / (nx * ny)**2
+    power_B_2d *= box_size_rad**2 / (nx * ny)**2
 
     # Binning
     ell_min = config.get('ell_min', 10)

@@ -150,17 +150,29 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     B = config['amplitudes']['B']
     C = config['amplitudes']['C']
 
-    # Calculate theoretical P_Phi from input power spectrum parameters
-    ps_index = config['power_spectrum']['index']
-    ps_amplitude = config['power_spectrum']['amplitude']
-    P_phi_theory = ps_amplitude * ell**ps_index
-
     # For comparison: what did we actually measure for Phi?
     P_phi_measured = results['phi_auto']
 
-    # Print ratio to diagnose normalization
-    print(f"\n  Normalization check:")
-    print(f"    Theory/Measured ratio for Phi: {np.median(P_phi_theory / P_phi_measured):.2e}")
+    # Calculate theoretical P_Phi from input power spectrum parameters
+    ps_type = config['power_spectrum'].get('type', 'power_law')
+    if ps_type == 'power_law':
+        ps_index = config['power_spectrum']['index']
+        ps_amplitude = config['power_spectrum']['amplitude']
+        P_phi_theory = ps_amplitude * ell**ps_index
+        print(f"\n  Normalization check:")
+        print(f"    Theory/Measured ratio for Phi: {np.median(P_phi_theory / P_phi_measured):.2e}")
+    elif ps_type == 'lcdm':
+        # Compute LCDM theory curve from CAMB at binned ell values
+        from cosmology import get_lcdm_lensing_power_spectrum
+        # Create 1D ell array as 2D grid for the function
+        ell_2d = ell.reshape(-1, 1)
+        P_phi_theory = get_lcdm_lensing_power_spectrum(ell_2d, config['power_spectrum']).flatten()
+        print(f"\n  LCDM theory from CAMB:")
+        print(f"    Theory/Measured ratio for Phi: {np.median(P_phi_theory / P_phi_measured):.2e}")
+    else:
+        # For other types, use measured as fallback
+        P_phi_theory = P_phi_measured
+        print(f"\n  Using measured Phi as reference (unknown PS type):")
 
     # Check the other fields too
     scalar_theory = A**2 * ell**4 * P_phi_measured  # Use measured Phi

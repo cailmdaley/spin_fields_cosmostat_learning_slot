@@ -1,227 +1,97 @@
 # Spin Fields from Gravitational Potential
 
-Generate four fields from a gravitational potential and compute their auto and cross power spectra using NaMaster.
+Generate correlated spin-0, spin-1, and spin-2 fields from a gravitational lensing potential using ΛCDM cosmology.
 
-## Physics Background
+## Physics
 
-This code implements three derived fields from a gravitational potential Φ in harmonic (Fourier) space:
+Four fields derived from gravitational potential Φ in harmonic space:
 
-1. **Gravitational Potential**: Φ(ℓ⃗) - generated from a power spectrum
-2. **Scalar field**: δ(ℓ⃗) = Aℓ²Φ(ℓ⃗)
-3. **Vector field**: α⃗(ℓ⃗) = Bℓe^(iφ_ℓ)Φ(ℓ⃗) = Biℓ⃗Φ(ℓ⃗)
-4. **Spin-2 field**: γ = Cℓ²e^(2iφ_ℓ)Φ(ℓ⃗) where φ_ℓ = tan⁻¹(ℓ₂/ℓ₁)
+| Field | Spin | Definition | Physical Analog |
+|-------|------|------------|-----------------|
+| Φ | 0 | Lensing potential | Gravitational potential |
+| δ | 0 | Aℓ²Φ̃ | Convergence (mass density) |
+| α | 1 | Bℓe^(iφ)Φ̃ | Deflection angle derivative |
+| γ | 2 | Cℓ²e^(2iφ)Φ̃ | Shear |
+
+All fields are correlated through their common origin in Φ.
 
 ## Installation
 
-Required packages:
 ```bash
-pip install numpy matplotlib scipy pymaster pyyaml
-```
-
-Or with conda:
-```bash
-conda install numpy matplotlib scipy pyyaml
-conda install -c conda-forge namaster
-```
-
-## Quick Start
-
-1. Edit the configuration file [config.yaml](config.yaml) to set your parameters
-2. Run the script:
-```bash
-python generate_fields.py
-```
-
-3. Check the `output/` directory for results
-
-## Configuration
-
-All parameters are set in [config.yaml](config.yaml):
-
-### Grid Parameters
-```yaml
-grid:
-  nx: 512                    # Grid size in x direction
-  ny: 512                    # Grid size in y direction
-  box_size_deg: 10.0         # Physical box size in degrees
-```
-
-### Field Amplitudes (A, B, C)
-```yaml
-amplitudes:
-  A: 1.0                     # Scalar field amplitude
-  B: 1.0                     # Vector field amplitude
-  C: 1.0                     # Spin-2 field amplitude
-```
-
-**These are the key parameters you'll want to adjust!** They control the relative amplitudes of the three derived fields.
-
-### Power Spectrum for Φ
-
-You can use a power-law spectrum or provide a custom one:
-
-**Option 1: Power Law**
-```yaml
-power_spectrum:
-  type: "power_law"
-  index: -2.0                # P(k) ~ k^index
-```
-
-**Option 2: Custom Power Spectrum**
-```yaml
-power_spectrum:
-  type: "custom"
-  custom_file: "my_power_spectrum.txt"  # Two columns: k, P(k)
-```
-
-### NaMaster Settings
-```yaml
-namaster:
-  n_bins: 20                 # Number of ell bins
-  ell_min: 2                 # Minimum ell
-  ell_max: null              # Maximum ell (null = auto)
-  use_log_bins: true         # Use logarithmic binning
-```
-
-### Output Settings
-```yaml
-output:
-  output_dir: "./output"     # Directory for output files
-  save_fields: true          # Save field arrays as .npy files
-  dpi: 150                   # DPI for PNG figures
+pip install numpy matplotlib scipy pymaster pyyaml camb
 ```
 
 ## Usage
 
-### Basic Usage
-
 ```bash
-python generate_fields.py
+python main.py config_lcdm.yaml
 ```
 
-This uses the default [config.yaml](config.yaml) file.
+Outputs go to `output_lcdm/`.
 
-### Use a Different Config File
+---
 
-```bash
-python generate_fields.py my_config.yaml
+## Blind Fitting Challenge
+
+The fields in `output_lcdm/` were generated for a cosmological parameter fitting exercise.
+
+### Fixed Parameters (known)
+
+| Parameter | Symbol | Value |
+|-----------|--------|-------|
+| Hubble parameter | h | 0.70 |
+| Baryon density | Ω_b | 0.05 |
+| Spectral index | n_s | 0.96 |
+| Source redshift | z_source | 1.0 |
+| Grid size | N | 512 × 512 |
+| Box size | θ | 10° |
+| Amplitudes | A, B, C | 1.0, 1.0, 1.0 |
+
+### Blind Parameters (to fit)
+
+| Parameter | Symbol | True Value | Planck 2018 |
+|-----------|--------|------------|-------------|
+| Matter density | Ω_m | ? | 0.315 |
+| S8 | S8 | ? | 0.832 |
+
+where S8 = σ₈√(Ω_m/0.3).
+
+### Data Files
+
+```
+output_lcdm/
+├── power_spectra.npz    # Measured C_ℓ (use this for fitting)
+├── phi_field.npy        # Lensing potential
+├── scalar_field.npy     # Convergence δ
+├── vector_field_x.npy   # Deflection α_x
+├── vector_field_y.npy   # Deflection α_y
+├── spin2_field_gamma1.npy  # Shear γ₁
+└── spin2_field_gamma2.npy  # Shear γ₂
 ```
 
-### Workflow
-
-The script follows these steps:
-
-1. **Generate Phi from power spectrum** - Creates the gravitational potential as a Gaussian random field
-2. **Generate three derived fields** - Applies the transformations in Fourier space
-3. **Create PNGs** - Visualizes all four fields
-4. **Calculate power spectra** - Computes all auto and cross-correlations with NaMaster
-
-## Output Files
-
-All output files are saved to the directory specified in the config (default: `./output/`):
-
-### Field Visualizations (PNG)
-- `phi_field.png` - Gravitational potential Φ
-- `scalar_field.png` - Scalar field δ
-- `vector_field.png` - Vector field α (magnitude with arrows)
-- `spin2_field_gamma1.png` - Spin-2 field component γ₁
-- `spin2_field_gamma2.png` - Spin-2 field component γ₂
-
-### Power Spectra
-- `power_spectra.png` - All auto and cross power spectra
-- `power_spectra.npz` - Power spectra data (can be loaded with `np.load()`)
-
-### Field Arrays (if save_fields: true)
-- `phi_field.npy`
-- `scalar_field.npy`
-- `vector_field_x.npy`, `vector_field_y.npy`
-- `spin2_field_gamma1.npy`, `spin2_field_gamma2.npy`
-
-## Power Spectra Computed
-
-The code computes all possible auto and cross power spectra:
-
-### Auto-correlations
-- Φ × Φ
-- δ × δ (scalar)
-- α × α (vector, EE/EB/BE/BB modes)
-- γ × γ (spin-2, EE/EB/BE/BB modes)
-
-### Cross-correlations
-- Φ × δ
-- Φ × α (E and B modes)
-- Φ × γ (E and B modes)
-- δ × α (E and B modes)
-- δ × γ (E and B modes)
-- α × γ (EE/EB/BE/BB modes)
-
-## Implementation Details
-
-### Field Generation
-
-All fields are generated in Fourier space and then transformed to real space:
-
-1. **Φ**: Generated from a power spectrum P(ℓ) with random Gaussian phases
-2. **δ**: Multiply Φ(ℓ) by ℓ² in Fourier space
-3. **α**: Apply gradient operator iℓ⃗ to Φ(ℓ)
-4. **γ**: Multiply Φ(ℓ) by ℓ²e^(2iφ_ℓ), which creates spin-2 structure
-
-### NaMaster Analysis
-
-NaMaster computes pseudo-C_ℓ power spectra with:
-- Proper treatment of mode coupling
-- E/B mode decomposition for spin-1 and spin-2 fields
-- Configurable binning schemes (linear or logarithmic)
-
-### Coordinate Conventions
-
-- ℓ⃗ = (ℓₓ, ℓᵧ): 2D wavevector in Fourier space
-- ℓ = |ℓ⃗| = √(ℓₓ² + ℓᵧ²): magnitude
-- φ_ℓ = arctan(ℓᵧ/ℓₓ): angle in Fourier space
-
-## Example: Loading and Analyzing Results
+### Power Spectra in `power_spectra.npz`
 
 ```python
-import numpy as np
-import matplotlib.pyplot as plt
-
-# Load power spectra
-data = np.load('output/power_spectra.npz')
-ell = data['ell']
-phi_auto = data['phi_auto']
-scalar_auto = data['scalar_auto']
-
-# Plot
-plt.loglog(ell, phi_auto, label='Φ auto')
-plt.loglog(ell, scalar_auto, label='δ auto')
-plt.xlabel(r'$\ell$')
-plt.ylabel(r'$C_\ell$')
-plt.legend()
-plt.show()
-
-# Load field arrays
-phi = np.load('output/phi_field.npy')
-scalar = np.load('output/scalar_field.npy')
-
-# Do further analysis...
+data = np.load('output_lcdm/power_spectra.npz')
+ell = data['ell']           # Multipole bins
+C_phi = data['phi_auto']    # C_ℓ^ΦΦ - fit this!
+C_delta = data['scalar_auto']
+C_gamma_EE = data['spin2_auto_EE']
+# ... and all cross-spectra
 ```
 
-## Tips
+### Theory Prediction
 
-- Start with the default config and adjust A, B, C to explore different field amplitude ratios
-- Use `power_spectrum_index: -2.0` for approximately white noise in real space
-- For larger grids, you may want to reduce `n_bins` or increase `ell_min` for faster computation
-- The vector field visualization shows both magnitude (colormap) and direction (arrows)
+For a given (Ω_m, S8), compute the lensing convergence power spectrum C_ℓ^κκ using CAMB:
 
-## References
+```python
+from cosmology import get_lcdm_lensing_power_spectrum
 
-- **NaMaster**: https://namaster.readthedocs.io/
-- **Spin-weighted fields**: Kamionkowski et al. (1997), Phys. Rev. D 55, 7368
+config = {'S8': 0.8, 'Omega_m': 0.3, 'h': 0.7, 'n_s': 0.96, 'z_source': 1.0}
+C_ell_theory = get_lcdm_lensing_power_spectrum(ell_grid, config)
+```
 
-## Troubleshooting
-
-**Import error for pymaster**: Install with `conda install -c conda-forge namaster`
-
-**Out of memory**: Reduce `nx` and `ny` in the config file
-
-**Plots look empty**: Check that A, B, C are not too small relative to the power spectrum normalization
+The derived fields scale as:
+- C_ℓ^δδ = A²ℓ⁴ C_ℓ^ΦΦ
+- C_ℓ^αα = B²ℓ² C_ℓ^ΦΦ
+- C_ℓ^γγ = C²ℓ⁴ C_ℓ^ΦΦ

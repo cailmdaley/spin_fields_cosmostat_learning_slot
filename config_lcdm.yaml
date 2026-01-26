@@ -1,0 +1,41 @@
+# Configuration for LCDM lensing fields
+# For the blind S8 fitting exercise
+
+# Grid parameters
+grid:
+  nx: 512                    # Grid size (smaller for faster generation)
+  ny: 512
+  box_size_deg: 10.0         # 10 degree patch
+
+# Random seed for reproducibility
+random_seed: 2024
+
+# Field amplitudes (relative to lensing convergence)
+amplitudes:
+  A: 1.0                     # Scalar field (δ ~ κ)
+  B: 1.0                     # Vector field (α̇)
+  C: 1.0                     # Spin-2 field (γ)
+
+# LCDM power spectrum configuration
+power_spectrum:
+  type: "lcdm"
+  # Cosmological parameters (BLIND - do not share with fitter!)
+  S8: 0.60                   # ~28% below Planck
+  Omega_m: 0.20              # ~35% below Planck
+  Omega_b: 0.05              # Baryon density
+  h: 0.7                     # Hubble parameter
+  n_s: 0.96                  # Scalar spectral index
+  z_source: 1.0              # Source redshift for lensing
+
+# Power spectrum measurement settings
+namaster:
+  n_bins: 20                 # Number of ell bins
+  ell_min: 50                # Avoid low-ell cosmic variance
+  ell_max: 2000              # Stay within CAMB's ell range
+  use_log_bins: true
+
+# Output settings
+output:
+  output_dir: "./output_lcdm"
+  save_fields: true
+  dpi: 150

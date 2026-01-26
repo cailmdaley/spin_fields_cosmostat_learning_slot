@@ -1,20 +1,82 @@
 """
 Library functions for generating fields from gravitational potential.
+
+Supports both simple power-law and realistic LCDM power spectra.
 """
 
 import numpy as np
 
+# Optional CAMB import for LCDM
+try:
+    from cosmology import get_lcdm_lensing_power_spectrum
+    HAS_COSMOLOGY = True
+except ImportError:
+    HAS_COSMOLOGY = False
 
-def enforce_hermitian_symmetry(field_fft, nx, ny):
-    """Ensure Hermitian symmetry for real-valued inverse FFT."""
-    # DC component must be real
-    field_fft[0, 0] = field_fft[0, 0].real
 
-    # Nyquist frequencies must be real if they exist
-    if nx % 2 == 0:
-        field_fft[nx//2, 0] = field_fft[nx//2, 0].real
-    if ny % 2 == 0:
-        field_fft[0, ny//2] = field_fft[0, ny//2].real
+def generate_hermitian_random_field(nx, ny, power_spectrum, rng=None):
+    """
+    Generate a complex Fourier field with proper Hermitian symmetry.
+
+    For a real-valued field in position space, its FFT must satisfy:
+    Φ̃(-ℓ) = Φ̃*(ℓ)
+
+    This means:
+    - DC mode (0,0) is real
+    - Nyquist modes are real
+    - Other modes come in conjugate pairs
+
+    Parameters:
+    -----------
+    nx, ny : int
+        Grid dimensions
+    power_spectrum : numpy.ndarray
+        2D power spectrum P(ℓ) with shape (nx, ny)
+    rng : numpy.random.Generator, optional
+        Random number generator
+
+    Returns:
+    --------
+    field_fft : numpy.ndarray
+        Complex field satisfying Hermitian symmetry
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    field_fft = np.zeros((nx, ny), dtype=complex)
+
+    # Standard deviation from power spectrum
+    # For proper normalization: ⟨|Φ̃|²⟩ = P(ℓ)
+    sigma = np.sqrt(power_spectrum / 2)  # Factor of 2 for real+imag parts
+
+    # DC mode (must be real)
+    field_fft[0, 0] = rng.normal() * np.sqrt(power_spectrum[0, 0])
+
+    # Fill modes with proper Hermitian pairing
+    # For mode (i, j), the conjugate mode is at (-i mod nx, -j mod ny)
+    for i in range(nx):
+        for j in range(ny):
+            if i == 0 and j == 0:
+                continue  # Already set DC
+
+            mi = (-i) % nx
+            mj = (-j) % ny
+
+            # Skip if we already set this mode via its conjugate pair
+            if (mi, mj) < (i, j):
+                continue
+
+            # Check if this is a self-conjugate mode (i == mi and j == mj)
+            # This happens at Nyquist when nx or ny is even
+            if i == mi and j == mj:
+                # Self-conjugate: must be real
+                field_fft[i, j] = rng.normal() * np.sqrt(power_spectrum[i, j])
+            else:
+                # Regular mode: set both (i,j) and (mi, mj) as conjugate pair
+                real_part = rng.normal() * sigma[i, j]
+                imag_part = rng.normal() * sigma[i, j]
+                field_fft[i, j] = real_part + 1j * imag_part
+                field_fft[mi, mj] = real_part - 1j * imag_part  # Conjugate
 
     return field_fft
 
@@ -22,6 +84,9 @@ def enforce_hermitian_symmetry(field_fft, nx, ny):
 def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config, seed=42):
     """
     Generate gravitational potential Phi from a power spectrum.
+
+    Creates a properly Hermitian-symmetric field so that phi_real is truly real
+    and E/B decomposition of derived spin fields works correctly.
 
     Parameters:
     -----------
@@ -39,15 +104,16 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
     phi_real : numpy.ndarray
         Gravitational potential in real space
     phi_fourier : numpy.ndarray
-        Gravitational potential in Fourier space
+        Gravitational potential in Fourier space (Hermitian-symmetric)
     """
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
 
-    # Resolution in degrees
-    dx = box_size_deg / nx
-    dy = box_size_deg / ny
+    # Convert box size to radians for proper ℓ calculation
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
 
-    # Create frequency grids
+    # Create frequency grids (ℓ = 2π × spatial_frequency in radians)
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
     ky = 2 * np.pi * np.fft.fftfreq(ny, d=dy)
     kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
@@ -65,6 +131,13 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
         power_spectrum = amplitude * ell**index
         # Avoid very small values at high ell
         power_spectrum = np.maximum(power_spectrum, 1e-20)
+    elif ps_type == 'lcdm':
+        # Use CAMB to compute LCDM lensing power spectrum
+        if not HAS_COSMOLOGY:
+            raise ImportError("cosmology module with CAMB required for LCDM. "
+                            "Install with: pip install camb")
+        power_spectrum = get_lcdm_lensing_power_spectrum(ell, power_spectrum_config)
+        # Scale for FFT normalization is handled below
     elif ps_type == 'custom':
         # Load custom power spectrum from file
         ps_file = power_spectrum_config['custom_file']
@@ -80,24 +153,16 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
 
     power_spectrum[0, 0] = 0  # Zero mean
 
-    # Generate complex Gaussian random field
-    real_part = np.random.randn(nx, ny)
-    imag_part = np.random.randn(nx, ny)
+    # Scale power spectrum for FFT normalization:
+    # We want ⟨|Φ̃|²⟩ = P(ℓ) in our measurement convention
+    # Measurement: P(k) = |FFT|² * (dx*dy)² / (nx*ny)
+    # So we need: |FFT|² = P(k) * (nx*ny) / (dx*dy)²
+    scaled_power = power_spectrum * (nx * ny) / ((dx * dy)**2)
 
-    # Scale by power spectrum
-    # To match the power spectrum measurement convention:
-    # P(k) = |FFT|^2 * (dx*dy)^2 / (nx*ny)
-    # So we need: |FFT|^2 = P(k) * (nx*ny) / (dx*dy)^2
-    # Note: After enforcing Hermitian symmetry, we effectively only have independent
-    # modes in half the Fourier space, but the conjugate constraint doubles the power.
-    # Empirically, we need an extra factor of sqrt(2) to match the measured power spectrum.
-    sigma = np.sqrt(power_spectrum * (nx * ny) / ((dx * dy)**2))
-    phi_fourier = (real_part + 1j * imag_part) * sigma
+    # Generate Hermitian-symmetric random field
+    phi_fourier = generate_hermitian_random_field(nx, ny, scaled_power, rng)
 
-    # Ensure Hermitian symmetry for real output
-    phi_fourier = enforce_hermitian_symmetry(phi_fourier, nx, ny)
-
-    # Transform to real space
+    # Transform to real space (should be purely real due to Hermitian symmetry)
     phi_real = np.fft.ifft2(phi_fourier).real
 
     return phi_real, phi_fourier
@@ -105,12 +170,15 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
 
 def generate_spin_field(phi_fourier, amplitude, ell_power, spin, nx, ny, box_size_deg):
     """
-    Unified function to generate spin-s field: f̃(ℓ⃗) = amplitude · ℓ^n · e^(i·s·φ_ℓ) · |Φ(ℓ⃗)|
+    Generate spin-s field: f̃(ℓ⃗) = amplitude · ℓ^n · e^(i·s·φ_ℓ) · Φ(ℓ⃗)
+
+    For fields derived from a scalar potential, this produces pure E-mode fields.
+    The E/B decomposition should use Hermitian symmetry (see measure_power_spectra.py).
 
     Parameters:
     -----------
     phi_fourier : numpy.ndarray
-        Gravitational potential in Fourier space
+        Gravitational potential in Fourier space (Hermitian-symmetric for real Φ)
     amplitude : float
         Amplitude coefficient (A, B, or C)
     ell_power : int
@@ -128,8 +196,10 @@ def generate_spin_field(phi_fourier, amplitude, ell_power, spin, nx, ny, box_siz
         For spin-0: single real array
         For spin>0: tuple of (component1, component2)
     """
-    dx = box_size_deg / nx
-    dy = box_size_deg / ny
+    # Convert to radians for proper ℓ values
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
 
     # Create frequency grids
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
@@ -140,14 +210,9 @@ def generate_spin_field(phi_fourier, amplitude, ell_power, spin, nx, ny, box_siz
     ell = np.sqrt(kx_grid**2 + ky_grid**2)
     phi_ell = np.arctan2(ky_grid, kx_grid)
 
-    # f̃(ℓ) = amplitude · ℓ^n · e^(i·s·φ_ℓ) · Φ(ℓ) or |Φ(ℓ)|
-    # For spin-0: use Φ directly (no E/B decomposition issue)
-    # For spin>0: use |Φ| to ensure pure E-mode
-    if spin == 0:
-        field_fourier = amplitude * (ell**ell_power) * phi_fourier
-    else:
-        # For complex Gaussian Φ: using |Φ| loses a factor of √2 in amplitude
-        field_fourier = amplitude * (ell**ell_power) * np.exp(1j * spin * phi_ell) * np.abs(phi_fourier) / np.sqrt(2)
+    # f̃(ℓ) = amplitude · ℓ^n · e^(i·s·φ_ℓ) · Φ(ℓ)
+    # Use full complex Φ for all fields to preserve correlations
+    field_fourier = amplitude * (ell**ell_power) * np.exp(1j * spin * phi_ell) * phi_fourier
 
     # Transform to real space
     if spin == 0:
@@ -155,7 +220,7 @@ def generate_spin_field(phi_fourier, amplitude, ell_power, spin, nx, ny, box_siz
         field_real = np.fft.ifft2(field_fourier).real
         return field_real
     else:
-        # Spin>0 fields have two components
+        # Spin>0 fields have two components (γ₁, γ₂) or (αₓ, αᵧ)
         field_complex = np.fft.ifft2(field_fourier)
         component1 = field_complex.real
         component2 = field_complex.imag
@@ -164,7 +229,7 @@ def generate_spin_field(phi_fourier, amplitude, ell_power, spin, nx, ny, box_siz
 
 def generate_scalar_field(phi_fourier, A, nx, ny, box_size_deg):
     """
-    Generate scalar field: δ(ℓ⃗) = Aℓ²e^(i·0·φ_ℓ)|Φ(ℓ⃗)| = Aℓ²|Φ(ℓ⃗)|
+    Generate scalar field: δ̃(ℓ⃗) = Aℓ²Φ̃(ℓ⃗)
 
     Spin-0 field with ℓ² power and no angular dependence.
     """
@@ -173,17 +238,19 @@ def generate_scalar_field(phi_fourier, A, nx, ny, box_size_deg):
 
 def generate_vector_field(phi_fourier, B, nx, ny, box_size_deg):
     """
-    Generate spin-1 field: α̃(ℓ⃗) = Bℓe^(i·1·φ_ℓ)|Φ(ℓ⃗)|
+    Generate spin-1 field: α̃(ℓ⃗) = Bℓe^(iφ_ℓ)Φ̃(ℓ⃗)
 
     Spin-1 field with ℓ¹ power and e^(iφ_ℓ) angular dependence.
+    Returns (αₓ, αᵧ) components in real space.
     """
     return generate_spin_field(phi_fourier, B, ell_power=1, spin=1, nx=nx, ny=ny, box_size_deg=box_size_deg)
 
 
 def generate_spin2_field(phi_fourier, C, nx, ny, box_size_deg):
     """
-    Generate spin-2 field: γ̃(ℓ⃗) = Cℓ²e^(i·2·φ_ℓ)|Φ(ℓ⃗)|
+    Generate spin-2 field: γ̃(ℓ⃗) = Cℓ²e^(2iφ_ℓ)Φ̃(ℓ⃗)
 
     Spin-2 field with ℓ² power and e^(2iφ_ℓ) angular dependence.
+    Returns (γ₁, γ₂) components in real space.
     """
     return generate_spin_field(phi_fourier, C, ell_power=2, spin=2, nx=nx, ny=ny, box_size_deg=box_size_deg)

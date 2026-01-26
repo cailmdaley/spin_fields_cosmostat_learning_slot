@@ -1,8 +1,32 @@
 """
 Measure power spectra from fields using FFT-based methods.
+
+Key concepts:
+- E/B decomposition for spin-s fields uses Hermitian symmetry
+- For field f̃(ℓ) = [Ẽ(ℓ) + iB̃(ℓ)] × e^{isφ_ℓ}
+- Extract: D(ℓ) = f̃(ℓ) × e^{-isφ_ℓ}
+- Then: Ẽ(ℓ) = [D(ℓ) + D*(-ℓ)] / 2
+         B̃(ℓ) = [D(ℓ) - D*(-ℓ)] / (2i)
 """
 
 import numpy as np
+
+
+def hermitian_conjugate_flip(arr):
+    """
+    Get D*(-ℓ) from D(ℓ) for proper E/B decomposition.
+
+    For FFT arrays with DC at (0,0), the mode at -ℓ = (-kx, -ky)
+    for mode at index (i, j) is at index (-i mod nx, -j mod ny).
+    """
+    nx, ny = arr.shape
+    # Create index arrays for -ℓ mapping
+    i_flip = np.arange(nx)
+    j_flip = np.arange(ny)
+    i_minus = (-i_flip) % nx
+    j_minus = (-j_flip) % ny
+    # Advanced indexing to get D(-ℓ) and then conjugate
+    return np.conj(arr[i_minus[:, None], j_minus[None, :]])
 
 
 def compute_power_spectrum_2d(field1, field2, box_size_deg, config):
@@ -35,8 +59,9 @@ def compute_power_spectrum_2d(field1, field2, box_size_deg, config):
     power_2d = (fft1 * np.conj(fft2)).real
 
     # Normalize
-    dx = box_size_deg / nx
-    dy = box_size_deg / ny
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
     power_2d *= (dx * dy)**2 / (nx * ny)
 
     # Create 2D ell grid
@@ -49,7 +74,7 @@ def compute_power_spectrum_2d(field1, field2, box_size_deg, config):
     ell_min = config.get('ell_min', 10)
     ell_max = config.get('ell_max', None)
     if ell_max is None:
-        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_deg)
+        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_rad)
     n_bins = config.get('n_bins', 20)
     use_log_bins = config.get('use_log_bins', True)
 
@@ -77,6 +102,11 @@ def compute_spin_power_auto(field_real, box_size_deg, config, spin):
     """
     Compute auto power spectrum for spin-weighted fields with E/B decomposition.
 
+    Uses proper Hermitian symmetry for E/B separation:
+    - D(ℓ) = f̃(ℓ) × e^{-isφ_ℓ}
+    - Ẽ(ℓ) = [D(ℓ) + D*(-ℓ)] / 2
+    - B̃(ℓ) = [D(ℓ) - D*(-ℓ)] / (2i)
+
     Parameters:
     -----------
     field_real : tuple
@@ -93,46 +123,38 @@ def compute_spin_power_auto(field_real, box_size_deg, config, spin):
     ell_centers, power_EE, power_BB, power_EB : numpy.ndarray
         E and B mode auto power spectra, and E×B cross power
     """
-    ny, nx = field_real[0].shape
+    c1, c2 = field_real
+    nx, ny = c1.shape
 
     # Create k-space grid
-    dx = box_size_deg / nx
-    dy = box_size_deg / ny
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
     ky = 2 * np.pi * np.fft.fftfreq(ny, d=dy)
     kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
     ell_2d = np.sqrt(kx_grid**2 + ky_grid**2)
-
-    # FFT of field components
-    c1, c2 = field_real
-
-    # Unified E/B mode decomposition for spin-s fields
-    # For a spin-s field in real space: f = c1 + i*c2
-    # In Fourier space: f̃(k) = [E(k) + i*B(k)] * e^(i*s*φ_k)
-    # Where φ_k = arctan(ky/kx)
-    #
-    # To extract E and B: E(k) + i*B(k) = f̃(k) * e^(-i*s*φ_k)
-
-    # First construct the complex field in real space
-    field_complex = c1 + 1j * c2
-
-    # Then FFT the complex field
-    field_fft = np.fft.fft2(field_complex)
-
     phi_k = np.arctan2(ky_grid, kx_grid)
 
-    # Decompose: multiply by e^(-i*s*φ_k)
-    decomposed = field_fft * np.exp(-1j * spin * phi_k)
-    E_fft = decomposed.real
-    B_fft = decomposed.imag
+    # FFT of complex field f = c1 + i*c2
+    field_complex = c1 + 1j * c2
+    field_fft = np.fft.fft2(field_complex)
 
-    # Power spectra
-    # For the decomposed field, we have E(k) and B(k) as real fields
-    # Auto-power: E×E and B×B
-    # Cross-power: E×B (should be zero for parity-symmetric fields)
-    power_E_2d = E_fft**2
-    power_B_2d = B_fft**2
-    power_EB_2d = E_fft * B_fft
+    # E/B decomposition using Hermitian symmetry
+    # D(ℓ) = f̃(ℓ) × e^{-isφ_ℓ}
+    D = field_fft * np.exp(-1j * spin * phi_k)
+
+    # Use Hermitian conjugate flip to get D*(-ℓ)
+    D_conj_flip = hermitian_conjugate_flip(D)
+
+    # Proper E/B separation
+    E_fft = (D + D_conj_flip) / 2  # Complex field with Hermitian symmetry
+    B_fft = (D - D_conj_flip) / (2j)  # Complex field with Hermitian symmetry
+
+    # Power spectra: |Ẽ|² and |B̃|²
+    power_E_2d = np.abs(E_fft)**2
+    power_B_2d = np.abs(B_fft)**2
+    power_EB_2d = (E_fft * np.conj(B_fft)).real
 
     # Normalize
     power_E_2d *= (dx * dy)**2 / (nx * ny)
@@ -143,7 +165,7 @@ def compute_spin_power_auto(field_real, box_size_deg, config, spin):
     ell_min = config.get('ell_min', 10)
     ell_max = config.get('ell_max', None)
     if ell_max is None:
-        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_deg)
+        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_rad)
     n_bins = config.get('n_bins', 20)
     use_log_bins = config.get('use_log_bins', True)
 
@@ -174,6 +196,8 @@ def compute_spin_cross(field1_scalar, field2_spin, box_size_deg, config, spin):
     """
     Compute cross power spectrum between scalar (spin-0) and spin field.
 
+    Uses proper Hermitian E/B decomposition for the spin field.
+
     Parameters:
     -----------
     field1_scalar : numpy.ndarray
@@ -192,48 +216,37 @@ def compute_spin_cross(field1_scalar, field2_spin, box_size_deg, config, spin):
     ell_centers, power_E, power_B : numpy.ndarray
         E and B mode cross power spectra
     """
-    ny, nx = field1_scalar.shape
+    nx, ny = field1_scalar.shape
 
     # Create k-space grid
-    dx = box_size_deg / nx
-    dy = box_size_deg / ny
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
     ky = 2 * np.pi * np.fft.fftfreq(ny, d=dy)
     kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
     ell_2d = np.sqrt(kx_grid**2 + ky_grid**2)
-
-    # FFT of fields
-    fft_scalar = np.fft.fft2(field1_scalar)
-
-    c1, c2 = field2_spin
-
-    # For cross-correlation between scalar and spin field:
-    # We should decompose the spin field FIRST into E and B modes,
-    # then compute cross with the scalar field.
-    #
-    # Scalar field has no E/B decomposition (it's just itself in Fourier space)
-    # Spin field: f̃(k) = [E(k) + iB(k)] × e^(isφ)
-
-    # First construct the complex spin field in real space
-    field_spin_complex = c1 + 1j * c2
-
-    # Then FFT the complex field
-    field_spin_fft = np.fft.fft2(field_spin_complex)
-
     phi_k = np.arctan2(ky_grid, kx_grid)
 
-    # Decompose spin field into E and B modes FIRST
-    # E(k) + iB(k) = f̃(k) × e^(-isφ)
-    decomposed_spin = field_spin_fft * np.exp(-1j * spin * phi_k)
-    E_fft = decomposed_spin.real
-    B_fft = decomposed_spin.imag
+    # FFT of scalar field
+    fft_scalar = np.fft.fft2(field1_scalar)
 
-    # Now compute cross-correlations: scalar × E and scalar × B
-    # For scalar S̃(k) (complex) and E(k), B(k) (real after decomposition):
-    # Cross power = S̃(k) × E(k) (real part gives the actual cross-correlation)
-    # Scale by 2 to account for |Φ|/√2 used in spin field generation
-    power_E_2d = fft_scalar.real * E_fft * 2
-    power_B_2d = fft_scalar.real * B_fft * 2
+    # FFT of spin field
+    c1, c2 = field2_spin
+    field_spin_complex = c1 + 1j * c2
+    field_spin_fft = np.fft.fft2(field_spin_complex)
+
+    # E/B decomposition of spin field using Hermitian symmetry
+    D = field_spin_fft * np.exp(-1j * spin * phi_k)
+    D_conj_flip = hermitian_conjugate_flip(D)
+
+    E_fft = (D + D_conj_flip) / 2
+    B_fft = (D - D_conj_flip) / (2j)
+
+    # Cross power: scalar × E and scalar × B
+    # C_ℓ = ⟨S̃(ℓ) × Ẽ*(ℓ)⟩
+    power_E_2d = (fft_scalar * np.conj(E_fft)).real
+    power_B_2d = (fft_scalar * np.conj(B_fft)).real
 
     # Normalize
     power_E_2d *= (dx * dy)**2 / (nx * ny)
@@ -243,7 +256,7 @@ def compute_spin_cross(field1_scalar, field2_spin, box_size_deg, config, spin):
     ell_min = config.get('ell_min', 10)
     ell_max = config.get('ell_max', None)
     if ell_max is None:
-        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_deg)
+        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_rad)
     n_bins = config.get('n_bins', 20)
     use_log_bins = config.get('use_log_bins', True)
 
@@ -272,14 +285,7 @@ def compute_spin_spin_cross(field1_spin, field2_spin, box_size_deg, config, spin
     """
     Compute cross power spectrum between two spin fields.
 
-    For spin-s1 and spin-s2 fields:
-    f1(k) = [E1(k) + iB1(k)] * e^(is1*φ)
-    f2(k) = [E2(k) + iB2(k)] * e^(is2*φ)
-
-    Cross: f1*(k) × f2(k) = [E1 - iB1] × [E2 + iB2] × e^(i(s2-s1)φ)
-
-    To extract E and B mode cross:
-    [E_cross + iB_cross] = f1*(k) × f2(k) × e^(-i(s2-s1)φ)
+    Uses proper Hermitian E/B decomposition for both fields.
 
     Parameters:
     -----------
@@ -297,50 +303,41 @@ def compute_spin_spin_cross(field1_spin, field2_spin, box_size_deg, config, spin
     Returns:
     --------
     ell_centers, power_E, power_B : numpy.ndarray
-        E and B mode cross power spectra
+        E and B mode cross power spectra (EE and BB)
     """
     c1_1, c2_1 = field1_spin
     c1_2, c2_2 = field2_spin
-    ny, nx = c1_1.shape
+    nx, ny = c1_1.shape
 
     # Create k-space grid
-    dx = box_size_deg / nx
-    dy = box_size_deg / ny
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
     ky = 2 * np.pi * np.fft.fftfreq(ny, d=dy)
     kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
     ell_2d = np.sqrt(kx_grid**2 + ky_grid**2)
-
-    # Construct complex fields in real space
-    field1_complex = c1_1 + 1j * c2_1
-    field2_complex = c1_2 + 1j * c2_2
-
-    # FFT both fields
-    field1_fft = np.fft.fft2(field1_complex)
-    field2_fft = np.fft.fft2(field2_complex)
-
     phi_k = np.arctan2(ky_grid, kx_grid)
 
-    # Decompose EACH field into E and B modes FIRST
-    # Field 1: E1(k) + iB1(k) = f1(k) × e^(-is1·φ)
-    decomposed1 = field1_fft * np.exp(-1j * spin1 * phi_k)
-    E1_fft = decomposed1.real
-    B1_fft = decomposed1.imag
+    # FFT both fields
+    field1_fft = np.fft.fft2(c1_1 + 1j * c2_1)
+    field2_fft = np.fft.fft2(c1_2 + 1j * c2_2)
 
-    # Field 2: E2(k) + iB2(k) = f2(k) × e^(-is2·φ)
-    decomposed2 = field2_fft * np.exp(-1j * spin2 * phi_k)
-    E2_fft = decomposed2.real
-    B2_fft = decomposed2.imag
+    # E/B decomposition for field 1
+    D1 = field1_fft * np.exp(-1j * spin1 * phi_k)
+    D1_conj_flip = hermitian_conjugate_flip(D1)
+    E1_fft = (D1 + D1_conj_flip) / 2
+    B1_fft = (D1 - D1_conj_flip) / (2j)
 
-    # Now compute cross power spectra:
-    # C_ℓ^EE = E1 × E2
-    # C_ℓ^BB = B1 × B2
-    # C_ℓ^EB = E1 × B2
-    # C_ℓ^BE = B1 × E2
-    # Note: For standard cross-correlation, we want EE and BB
-    # The "E-mode" cross power is EE, "B-mode" cross power is BB
-    power_E_2d = E1_fft * E2_fft * 4  # Factor of 4 = 2×2 for both fields using |Φ|/√2
-    power_B_2d = B1_fft * B2_fft * 4
+    # E/B decomposition for field 2
+    D2 = field2_fft * np.exp(-1j * spin2 * phi_k)
+    D2_conj_flip = hermitian_conjugate_flip(D2)
+    E2_fft = (D2 + D2_conj_flip) / 2
+    B2_fft = (D2 - D2_conj_flip) / (2j)
+
+    # Cross power spectra: E1×E2* and B1×B2*
+    power_E_2d = (E1_fft * np.conj(E2_fft)).real
+    power_B_2d = (B1_fft * np.conj(B2_fft)).real
 
     # Normalize
     power_E_2d *= (dx * dy)**2 / (nx * ny)
@@ -350,7 +347,7 @@ def compute_spin_spin_cross(field1_spin, field2_spin, box_size_deg, config, spin
     ell_min = config.get('ell_min', 10)
     ell_max = config.get('ell_max', None)
     if ell_max is None:
-        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_deg)
+        ell_max = np.sqrt(2) * np.pi * min(nx, ny) / (2 * box_size_rad)
     n_bins = config.get('n_bins', 20)
     use_log_bins = config.get('use_log_bins', True)
 

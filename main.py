@@ -181,7 +181,7 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     spin2_theory = C**2 * ell**4 * P_phi_measured
 
     print(f"    Theory/Measured ratio for Scalar (δ): {np.median(scalar_theory / results['scalar_auto']):.2e}")
-    print(f"    Theory/Measured ratio for Vector (α): {np.median(vector_theory / results['vector_auto_EE']):.2e}")
+    print(f"    Theory/Measured ratio for Vector (α̇): {np.median(vector_theory / results['vector_auto_EE']):.2e}")
     print(f"    Vector B-mode / E-mode ratio: {np.median(results['vector_auto_BB'] / results['vector_auto_EE']):.2e}")
     print(f"    Vector EB / E-mode ratio: {np.median(np.abs(results['vector_auto_EB']) / results['vector_auto_EE']):.2e}")
     print(f"    Vector B-mode (median): {np.median(results['vector_auto_BB']):.2e}, E-mode (median): {np.median(results['vector_auto_EE']):.2e}")
@@ -194,15 +194,15 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     theory = compute_theoretical_power_spectra(ell, P_phi_theory, A, B, C)
 
     # Define field names
-    fields = ['Φ', 'δ', 'α', 'γ']
+    fields = ['ψ', 'κ', 'α̇', 'γ']
 
     # Row 0, Col 0: Φ auto (scalar, only in E-mode plot)
     ax = axes[0, 0]
     if mode == 'E':
         ax.loglog(ell, results['phi_auto'], 'o', ms=6, label='Measured', color='C0', alpha=0.7)
         ax.loglog(ell, theory['phi_auto'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-        ax.set_ylabel(r'$C_\ell^{\Phi\Phi}$', fontsize=11)
-        ax.set_title(r'$C_\ell^{\Phi\Phi}$', fontsize=12, fontweight='bold')
+        ax.set_ylabel(r'$C_\ell^{\psi\psi}$', fontsize=11)
+        ax.set_title(r'$C_\ell^{\psi\psi}$', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
         ax.set_xticklabels([])
@@ -214,7 +214,7 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     if mode == 'E':
         ax.loglog(ell, np.abs(results['phi_scalar_cross']), 'o', ms=6, label='Measured', color='C1', alpha=0.7)
         ax.loglog(ell, theory['phi_scalar'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-        ax.set_title(r'$C_\ell^{\Phi\delta} = A\ell^2 P_\Phi(\ell)$', fontsize=11, fontweight='bold')
+        ax.set_title(r'$C_\ell^{\psi\kappa} = A\ell^2 P_\psi(\ell)$', fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
         ax.set_xticklabels([])
@@ -232,9 +232,9 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
         ax.loglog(ell, np.abs(results[data_key]), 'o', ms=6, label='Measured', color='C2', alpha=0.7)
         if mode == 'E':
             ax.loglog(ell, theory['phi_vector'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-            title = r'$C_\ell^{\Phi\alpha} = B\ell P_\Phi(\ell)$'
+            title = r'$C_\ell^{\psi\dot{\alpha}} = B\ell P_\psi(\ell)$'
         else:
-            title = r'$C_\ell^{\Phi\alpha}$ (B-mode, should be $\approx 0$)'
+            title = r'$C_\ell^{\psi\dot{\alpha}}$ (B-mode, should be $\approx 0$)'
         ax.set_title(title, fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
@@ -250,9 +250,9 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
         ax.loglog(ell, np.abs(results[data_key]), 'o', ms=6, label='Measured', color='C3', alpha=0.7)
         if mode == 'E':
             ax.loglog(ell, theory['phi_spin2'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-            title = r'$C_\ell^{\Phi\gamma} = C\ell^2 P_\Phi(\ell)$'
+            title = r'$C_\ell^{\psi\gamma} = C\ell^2 P_\psi(\ell)$'
         else:
-            title = r'$C_\ell^{\Phi\gamma}$ (B-mode, should be $\approx 0$)'
+            title = r'$C_\ell^{\psi\gamma}$ (B-mode, should be $\approx 0$)'
         ax.set_title(title, fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
@@ -267,8 +267,8 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     if mode == 'E':
         ax.loglog(ell, results['scalar_auto'], 'o', ms=6, label='Measured', color='C4', alpha=0.7)
         ax.loglog(ell, theory['scalar_auto'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-        ax.set_ylabel(r'$C_\ell^{\delta\delta}$', fontsize=11)
-        ax.set_title(r'$C_\ell^{\delta\delta} = A^2\ell^4 P_\Phi(\ell)$', fontsize=11, fontweight='bold')
+        ax.set_ylabel(r'$C_\ell^{\kappa\kappa}$', fontsize=11)
+        ax.set_title(r'$C_\ell^{\kappa\kappa} = A^2\ell^4 P_\psi(\ell)$', fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
         ax.set_xticklabels([])
@@ -284,9 +284,9 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
         ax.loglog(ell, np.abs(results[data_key]), 'o', ms=6, label='Measured', color='C5', alpha=0.7)
         if mode == 'E':
             ax.loglog(ell, theory['scalar_vector'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-            title = r'$C_\ell^{\delta\alpha} = AB\ell^3 P_\Phi(\ell)$'
+            title = r'$C_\ell^{\kappa\dot{\alpha}} = AB\ell^3 P_\psi(\ell)$'
         else:
-            title = r'$C_\ell^{\delta\alpha}$ (B-mode, should be $\approx 0$)'
+            title = r'$C_\ell^{\kappa\dot{\alpha}}$ (B-mode, should be $\approx 0$)'
         ax.set_title(title, fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
@@ -302,9 +302,9 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
         ax.loglog(ell, np.abs(results[data_key]), 'o', ms=6, label='Measured', color='C6', alpha=0.7)
         if mode == 'E':
             ax.loglog(ell, theory['scalar_spin2'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-            title = r'$C_\ell^{\delta\gamma} = AC\ell^4 P_\Phi(\ell)$'
+            title = r'$C_\ell^{\kappa\gamma} = AC\ell^4 P_\psi(\ell)$'
         else:
-            title = r'$C_\ell^{\delta\gamma}$ (B-mode, should be $\approx 0$)'
+            title = r'$C_\ell^{\kappa\gamma}$ (B-mode, should be $\approx 0$)'
         ax.set_title(title, fontsize=11, fontweight='bold')
         ax.grid(True, alpha=0.3, which='both')
         ax.legend(fontsize=9)
@@ -322,12 +322,12 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     ax.loglog(ell, np.abs(results[f'vector_auto_{mode_suffix}']), 'o', ms=6, label=f'Measured ({mode_suffix})', color='C7', alpha=0.7)
     if mode == 'E':
         ax.loglog(ell, theory['vector_auto'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-        title = r'$C_\ell^{\alpha\alpha} = B^2\ell^2 P_\Phi(\ell)$'
+        title = r'$C_\ell^{\dot{\alpha}\dot{\alpha}} = B^2\ell^2 P_\psi(\ell)$'
     elif mode == 'B':
-        title = r'$C_\ell^{\alpha\alpha}$ (BB, should be $\approx 0$)'
+        title = r'$C_\ell^{\dot{\alpha}\dot{\alpha}}$ (BB, should be $\approx 0$)'
     else:  # mode == 'EB'
-        title = r'$C_\ell^{\alpha\alpha}$ (EB, should be $\approx 0$)'
-    ax.set_ylabel(r'$C_\ell^{\alpha\alpha}$', fontsize=11)
+        title = r'$C_\ell^{\dot{\alpha}\dot{\alpha}}$ (EB, should be $\approx 0$)'
+    ax.set_ylabel(r'$C_\ell^{\dot{\alpha}\dot{\alpha}}$', fontsize=11)
     ax.set_title(title, fontsize=11, fontweight='bold')
     ax.grid(True, alpha=0.3, which='both')
     ax.legend(fontsize=9)
@@ -339,11 +339,11 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     ax.loglog(ell, np.abs(results[data_key]), 'o', ms=6, label='Measured', color='C8', alpha=0.7)
     if mode == 'E':
         ax.loglog(ell, theory['vector_spin2'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-        title = r'$C_\ell^{\alpha\gamma} = BC\ell^3 P_\Phi(\ell)$'
+        title = r'$C_\ell^{\dot{\alpha}\gamma} = BC\ell^3 P_\psi(\ell)$'
     elif mode == 'B':
-        title = r'$C_\ell^{\alpha\gamma}$ (BB, should be $\approx 0$)'
+        title = r'$C_\ell^{\dot{\alpha}\gamma}$ (BB, should be $\approx 0$)'
     else:  # mode == 'EB'
-        title = r'$C_\ell^{\alpha\gamma}$ (EB, should be $\approx 0$)'
+        title = r'$C_\ell^{\dot{\alpha}\gamma}$ (EB, should be $\approx 0$)'
     ax.set_title(title, fontsize=11, fontweight='bold')
     ax.grid(True, alpha=0.3, which='both')
     ax.legend(fontsize=9)
@@ -364,7 +364,7 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
     ax.loglog(ell, np.abs(results[f'spin2_auto_{mode_suffix}']), 'o', ms=6, label=f'Measured ({mode_suffix})', color='C9', alpha=0.7)
     if mode == 'E':
         ax.loglog(ell, theory['spin2_auto'], '-', lw=2, label='Theory', color='black', alpha=0.8)
-        title = r'$C_\ell^{\gamma\gamma} = C^2\ell^4 P_\Phi(\ell)$'
+        title = r'$C_\ell^{\gamma\gamma} = C^2\ell^4 P_\psi(\ell)$'
     elif mode == 'B':
         title = r'$C_\ell^{\gamma\gamma}$ (BB, should be $\approx 0$)'
     else:  # mode == 'EB'
@@ -442,7 +442,7 @@ def main(config_path="config.yaml"):
     scalar_field = generate_scalar_field(phi_fourier, A, nx, ny, box_size_deg)
     print(f"    Statistics: mean={scalar_field.mean():.2e}, std={scalar_field.std():.2e}")
 
-    print("  Generating vector field α(ℓ) = Biℓ Φ(ℓ)...")
+    print("  Generating deflection rate field α̇(ℓ) = Bℓe^{iφ}ψ(ℓ)...")
     vector_fields = generate_vector_field(phi_fourier, B, nx, ny, box_size_deg)
     vx, vy = vector_fields
     print(f"    Statistics: vx mean={vx.mean():.2e}, std={vx.std():.2e}")
@@ -462,10 +462,10 @@ def main(config_path="config.yaml"):
     plot_field(phi_real, 'Gravitational Potential Φ',
               f'{output_dir}/phi_field.png', cmap='RdBu_r', dpi=dpi)
 
-    plot_field(scalar_field, r'Scalar Field δ = $A\ell^2\Phi$',
+    plot_field(scalar_field, r'Convergence $\kappa = A\ell^2\psi$',
               f'{output_dir}/scalar_field.png', cmap='RdBu_r', dpi=dpi)
 
-    plot_field(vector_fields, r'Vector Field α = $Bi\ell\Phi$ (magnitude + arrows)',
+    plot_field(vector_fields, r'Deflection Rate $\dot{\alpha} = B\ell e^{i\phi}\psi$ (magnitude + arrows)',
               f'{output_dir}/vector_field.png', cmap='viridis', dpi=dpi)
 
     # For spin-2, create two plots (one for each component)

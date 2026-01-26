@@ -136,8 +136,13 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
         if not HAS_COSMOLOGY:
             raise ImportError("cosmology module with CAMB required for LCDM. "
                             "Install with: pip install camb")
-        power_spectrum = get_lcdm_lensing_power_spectrum(ell, power_spectrum_config)
-        # Scale for FFT normalization is handled below
+        # CAMB gives C_ℓ^κκ (convergence), convert to C_ℓ^ψψ (potential)
+        # κ = ½ℓ²ψ → C_ℓ^κκ = ℓ⁴/4 × C_ℓ^ψψ → C_ℓ^ψψ = 4 C_ℓ^κκ / ℓ⁴
+        C_ell_kappa = get_lcdm_lensing_power_spectrum(ell, power_spectrum_config)
+        # Avoid division by zero at ℓ=0
+        ell_safe = np.where(ell > 0, ell, 1)
+        power_spectrum = 4 * C_ell_kappa / ell_safe**4
+        power_spectrum[ell == 0] = 0
     elif ps_type == 'custom':
         # Load custom power spectrum from file
         ps_file = power_spectrum_config['custom_file']

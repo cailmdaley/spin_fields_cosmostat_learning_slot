@@ -10,11 +10,15 @@ grid:
 # Random seed for reproducibility
 random_seed: 2024
 
-# Field amplitudes (relative to lensing convergence)
+# Field amplitudes for physical lensing fields
+# With ψ = lensing potential, the physical fields are:
+#   κ = ½ℓ²ψ (convergence) → A = 0.5
+#   α = ℓψ (deflection)    → B = 1.0
+#   γ = ½ℓ²e^{2iφ}ψ (shear) → C = 0.5
 amplitudes:
-  A: 1.0                     # Scalar field (δ ~ κ)
-  B: 1.0                     # Vector field (α̇)
-  C: 1.0                     # Spin-2 field (γ)
+  A: 0.5                     # Scalar: κ = ½ℓ²ψ
+  B: 1.0                     # Vector: α = ℓψ
+  C: 0.5                     # Spin-2: γ = ½ℓ²ψ
 
 # LCDM power spectrum configuration
 power_spectrum:

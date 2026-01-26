@@ -163,12 +163,13 @@ def plot_power_spectra(results, output_path, config, mode='E', dpi=150):
         print(f"    Theory/Measured ratio for Phi: {np.median(P_phi_theory / P_phi_measured):.2e}")
     elif ps_type == 'lcdm':
         # Compute LCDM theory curve from CAMB at binned ell values
+        # CAMB gives C_ℓ^κκ, convert to C_ℓ^ψψ = 4 C_ℓ^κκ / ℓ⁴
         from cosmology import get_lcdm_lensing_power_spectrum
-        # Create 1D ell array as 2D grid for the function
         ell_2d = ell.reshape(-1, 1)
-        P_phi_theory = get_lcdm_lensing_power_spectrum(ell_2d, config['power_spectrum']).flatten()
-        print(f"\n  LCDM theory from CAMB:")
-        print(f"    Theory/Measured ratio for Phi: {np.median(P_phi_theory / P_phi_measured):.2e}")
+        C_ell_kappa = get_lcdm_lensing_power_spectrum(ell_2d, config['power_spectrum']).flatten()
+        P_phi_theory = 4 * C_ell_kappa / ell**4  # C_ℓ^ψψ (potential)
+        print(f"\n  LCDM theory from CAMB (C_ℓ^ψψ = 4 C_ℓ^κκ / ℓ⁴):")
+        print(f"    Theory/Measured ratio for Phi (ψ): {np.median(P_phi_theory / P_phi_measured):.2e}")
     else:
         # For other types, use measured as fallback
         P_phi_theory = P_phi_measured

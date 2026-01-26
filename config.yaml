@@ -1,0 +1,37 @@
+# Configuration file for spin field generation
+
+# Grid parameters
+grid:
+  nx: 1024                    # Grid size in x direction
+  ny: 1024                   # Grid size in y direction
+  box_size_deg: 10.0         # Physical box size in degrees
+
+# Random seed for reproducibility
+random_seed: 42
+
+# Field amplitudes
+amplitudes:
+  A: 1.0                     # Scalar field amplitude
+  B: 2.0                     # Vector field amplitude
+  C: 2.0                     # Spin-2 field amplitude
+
+# Power spectrum for gravitational potential Phi
+power_spectrum:
+  type: "power_law"          # Type: "power_law" or "custom"
+  index: -1.5               # Power spectrum P(k) ~ k^index
+  amplitude: 1000000.0       # Overall amplitude of power spectrum
+  # If type is "custom", specify path to file with k and P(k) columns
+  # custom_file: "my_power_spectrum.txt"
+
+# NaMaster correlation parameters
+namaster:
+  n_bins: 20                 # Number of ell bins
+  ell_min: 10                # Minimum ell (avoid very low-ell modes)
+  ell_max: null              # Maximum ell (null = auto-set to Nyquist)
+  use_log_bins: true         # Use logarithmic binning
+
+# Output settings
+output:
+  output_dir: "./output"     # Directory for output files
+  save_fields: true          # Save field arrays as .npy files
+  dpi: 150                   # DPI for PNG figures

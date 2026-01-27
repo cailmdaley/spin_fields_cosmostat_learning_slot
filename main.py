@@ -459,7 +459,7 @@ def main(config_path="config.yaml"):
     print("STEP 3: Create field visualizations")
     print("="*60)
 
-    plot_field(phi_real, 'Gravitational Potential Φ',
+    plot_field(phi_real, r'Lensing Potential $\psi$',
               f'{output_dir}/phi_field.png', cmap='RdBu_r', dpi=dpi)
 
     plot_field(scalar_field, r'Convergence $\kappa = A\ell^2\psi$',
@@ -469,10 +469,10 @@ def main(config_path="config.yaml"):
               f'{output_dir}/vector_field.png', cmap='viridis', dpi=dpi)
 
     # For spin-2, create two plots (one for each component)
-    plot_field(gamma1, r'Spin-2 Field $\gamma_1$',
+    plot_field(gamma1, r'Shear $\gamma_1 = \mathrm{Re}(C\ell^2 e^{2i\phi}\psi)$',
               f'{output_dir}/spin2_field_gamma1.png', cmap='RdBu_r', dpi=dpi)
 
-    plot_field(gamma2, r'Spin-2 Field $\gamma_2$',
+    plot_field(gamma2, r'Shear $\gamma_2 = \mathrm{Im}(C\ell^2 e^{2i\phi}\psi)$',
               f'{output_dir}/spin2_field_gamma2.png', cmap='RdBu_r', dpi=dpi)
 
     # Save field arrays if requested

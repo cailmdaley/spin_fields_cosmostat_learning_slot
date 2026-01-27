@@ -92,7 +92,9 @@ def plot_field_with_vectors(scalar_field, vx, vy, title, output_path,
     mag_max = np.percentile(mag, 90)
     arrow_scale = arrow_step * 0.7 / mag_max if mag_max > 0 else 1
 
-    ax.quiver(X, Y, vx_sub * arrow_scale, vy_sub * arrow_scale,
+    # The spin-1 field ℓe^{iφ}ψ is 90° rotated from gradient ∇ψ = iℓe^{iφ}ψ
+    # Rotate (vx, vy) → (-vy, vx) to show gradient direction (toward overdensities)
+    ax.quiver(X, Y, -vy_sub * arrow_scale, vx_sub * arrow_scale,
               color='black', alpha=0.8, scale=1, scale_units='xy',
               width=0.004, headwidth=3.5, headlength=4)
 

@@ -28,7 +28,7 @@ def find_peak_region(field, size=128):
 
 def plot_field_with_vectors(scalar_field, vx, vy, title, output_path,
                             cmap='RdBu_r', arrow_step=25, dpi=150,
-                            zoom_center=None, zoom_size=None):
+                            zoom_center=None, zoom_size=None, smooth_sigma=None):
     """
     Plot a scalar field with vector arrows overlaid.
 
@@ -52,8 +52,16 @@ def plot_field_with_vectors(scalar_field, vx, vy, title, output_path,
         (x, y) center for zoom, or None for full field
     zoom_size : int
         Size of zoom region in pixels
+    smooth_sigma : float
+        Gaussian smoothing sigma in pixels (None for no smoothing)
     """
     fig, ax = plt.subplots(figsize=(10, 9))
+
+    # Smooth fields if requested
+    if smooth_sigma is not None:
+        scalar_field = gaussian_filter(scalar_field, sigma=smooth_sigma)
+        vx = gaussian_filter(vx, sigma=smooth_sigma)
+        vy = gaussian_filter(vy, sigma=smooth_sigma)
 
     # Extract zoom region if specified
     if zoom_center is not None and zoom_size is not None:
@@ -139,26 +147,34 @@ def main():
         arrow_step=20
     )
 
-    # Zoomed views - arrows should clearly point toward κ > 0
-    print("\nGenerating zoomed plots...")
-    plot_field_with_vectors(
-        psi.copy(), vx.copy(), vy.copy(),
-        title=r'$\psi$ with $\dot{\alpha}$ (zoomed)',
-        output_path=output_dir / 'psi_with_alpha_dot_zoom.png',
-        cmap='RdBu_r',
-        arrow_step=8,
-        zoom_center=(cx, cy),
-        zoom_size=zoom_size
-    )
+    # Smoothed views - easier to see large-scale structure
+    print("\nGenerating smoothed plots...")
+    smooth_sigma = 10  # pixels
 
     plot_field_with_vectors(
         kappa.copy(), vx.copy(), vy.copy(),
-        title=r'$\kappa$ with $\dot{\alpha}$ (zoomed)',
-        output_path=output_dir / 'kappa_with_alpha_dot_zoom.png',
+        title=r'$\kappa$ with $\dot{\alpha}$ (smoothed $\sigma=10$ px)',
+        output_path=output_dir / 'kappa_with_alpha_dot_smooth.png',
         cmap='RdBu_r',
-        arrow_step=8,
-        zoom_center=(cx, cy),
-        zoom_size=zoom_size
+        arrow_step=15,
+        smooth_sigma=smooth_sigma
+    )
+
+    # Zoomed + smoothed - best for seeing correlation
+    print("\nGenerating zoomed + smoothed plots...")
+    zoom_size_lg = 200
+    cx2, cy2 = find_peak_region(gaussian_filter(kappa, sigma=smooth_sigma), size=zoom_size_lg)
+    print(f"  Smoothed zoom center: ({cx2}, {cy2})")
+
+    plot_field_with_vectors(
+        kappa.copy(), vx.copy(), vy.copy(),
+        title=r'$\kappa$ with $\dot{\alpha}$ (smoothed + zoomed)',
+        output_path=output_dir / 'kappa_with_alpha_dot_smooth_zoom.png',
+        cmap='RdBu_r',
+        arrow_step=10,
+        zoom_center=(cx2, cy2),
+        zoom_size=zoom_size_lg,
+        smooth_sigma=smooth_sigma
     )
 
     print("\nDone!")

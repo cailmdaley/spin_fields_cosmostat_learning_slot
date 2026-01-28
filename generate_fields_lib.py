@@ -1,17 +1,15 @@
 """
-Library functions for generating fields from gravitational potential.
+Library functions for generating spin-weighted fields from gravitational potential.
 
-Supports both simple power-law and realistic LCDM power spectra.
+Fields derived from a scalar potential Φ:
+    κ (convergence) = Bℓ²Φ           (spin-0)
+    α (velocity)    = Cℓe^{iφ}Φ      (spin-1)
+    γ (shear)       = Dℓ²e^{2iφ}Φ    (spin-2)
+
+All fields derived from a scalar potential are pure E-mode.
 """
 
 import numpy as np
-
-# Optional CAMB import for LCDM
-try:
-    from cosmology import get_lcdm_lensing_power_spectrum
-    HAS_COSMOLOGY = True
-except ImportError:
-    HAS_COSMOLOGY = False
 
 
 def generate_hermitian_random_field(nx, ny, power_spectrum, rng=None):
@@ -122,39 +120,19 @@ def generate_phi_from_power_spectrum(nx, ny, box_size_deg, power_spectrum_config
     ell = np.sqrt(kx_grid**2 + ky_grid**2)
     ell[0, 0] = 1.0  # Avoid division by zero
 
-    # Generate power spectrum
+    # Generate power spectrum: P_Φ(ℓ) = A × ℓ^n / (1 + (ℓ₀/ℓ)²)
+    # Broken power law to regularize IR divergence
     ps_type = power_spectrum_config.get('type', 'power_law')
+    if ps_type != 'power_law':
+        raise ValueError(f"Only 'power_law' type supported, got: {ps_type}")
 
-    if ps_type == 'power_law':
-        index = power_spectrum_config.get('index', -2.0)
-        amplitude = power_spectrum_config.get('amplitude', 1.0)
-        power_spectrum = amplitude * ell**index
-        # Avoid very small values at high ell
-        power_spectrum = np.maximum(power_spectrum, 1e-20)
-    elif ps_type == 'lcdm':
-        # Use CAMB to compute LCDM lensing power spectrum
-        if not HAS_COSMOLOGY:
-            raise ImportError("cosmology module with CAMB required for LCDM. "
-                            "Install with: pip install camb")
-        # CAMB gives C_ℓ^κκ (convergence), convert to C_ℓ^ψψ (potential)
-        # κ = ½ℓ²ψ → C_ℓ^κκ = ℓ⁴/4 × C_ℓ^ψψ → C_ℓ^ψψ = 4 C_ℓ^κκ / ℓ⁴
-        C_ell_kappa = get_lcdm_lensing_power_spectrum(ell, power_spectrum_config)
-        # Avoid division by zero at ℓ=0
-        ell_safe = np.where(ell > 0, ell, 1)
-        power_spectrum = 4 * C_ell_kappa / ell_safe**4
-        power_spectrum[ell == 0] = 0
-    elif ps_type == 'custom':
-        # Load custom power spectrum from file
-        ps_file = power_spectrum_config['custom_file']
-        data = np.loadtxt(ps_file)
-        k_data = data[:, 0]
-        pk_data = data[:, 1]
-        # Interpolate to current k grid
-        from scipy.interpolate import interp1d
-        ps_interp = interp1d(k_data, pk_data, bounds_error=False, fill_value=0)
-        power_spectrum = ps_interp(ell)
-    else:
-        raise ValueError(f"Unknown power spectrum type: {ps_type}")
+    index = power_spectrum_config.get('index', -2.0)
+    amplitude = power_spectrum_config.get('amplitude', 1.0)
+    ell_0 = power_spectrum_config.get('ell_0', 10.0)  # IR cutoff scale
+
+    # Broken power law: flattens at low ℓ for IR convergence
+    power_spectrum = amplitude * ell**index / (1 + (ell_0 / ell)**2)
+    power_spectrum = np.maximum(power_spectrum, 1e-20)  # Numerical floor
 
     power_spectrum[0, 0] = 0  # Zero mean
 
@@ -243,19 +221,43 @@ def generate_scalar_field(phi_fourier, A, nx, ny, box_size_deg):
 
 def generate_vector_field(phi_fourier, B, nx, ny, box_size_deg):
     """
-    Generate spin-1 field: α̃(ℓ⃗) = Bℓe^(iφ_ℓ)Φ̃(ℓ⃗)
+    Generate spin-1 velocity field as gradient of potential.
 
-    Spin-1 field with ℓ¹ power and e^(iφ_ℓ) angular dependence.
+    The gradient ∇Φ in Fourier space has components:
+        α̃_x = i k_x Φ̃
+        α̃_y = i k_y Φ̃
+
+    For NaMaster E/B decomposition to work correctly with the gradient as E-mode,
+    we generate the Cartesian components directly.
+
     Returns (αₓ, αᵧ) components in real space.
     """
-    return generate_spin_field(phi_fourier, B, ell_power=1, spin=1, nx=nx, ny=ny, box_size_deg=box_size_deg)
+    box_size_rad = box_size_deg * np.pi / 180.0
+    dx = box_size_rad / nx
+    dy = box_size_rad / ny
+
+    kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
+    ky = 2 * np.pi * np.fft.fftfreq(ny, d=dy)
+    kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
+
+    # Gradient components: ∂Φ/∂x = i k_x Φ, ∂Φ/∂y = i k_y Φ
+    alpha_x_fourier = B * 1j * kx_grid * phi_fourier
+    alpha_y_fourier = B * 1j * ky_grid * phi_fourier
+
+    # Transform to real space (should be real due to Hermitian symmetry)
+    alpha_x = np.fft.ifft2(alpha_x_fourier).real
+    alpha_y = np.fft.ifft2(alpha_y_fourier).real
+
+    return alpha_x, alpha_y
 
 
 def generate_spin2_field(phi_fourier, C, nx, ny, box_size_deg):
     """
-    Generate spin-2 field: γ̃(ℓ⃗) = Cℓ²e^(2iφ_ℓ)Φ̃(ℓ⃗)
+    Generate spin-2 shear field: γ̃(ℓ⃗) = -Cℓ²e^(2iφ_ℓ)Φ̃(ℓ⃗)
 
-    Spin-2 field with ℓ² power and e^(2iφ_ℓ) angular dependence.
+    Following main.tex convention: γ̃ = -ℓ₊²Φ̃ where ℓ₊ = ℓe^{iφ_ℓ}.
+    The minus sign comes from the second derivative of the lensing potential.
     Returns (γ₁, γ₂) components in real space.
     """
-    return generate_spin_field(phi_fourier, C, ell_power=2, spin=2, nx=nx, ny=ny, box_size_deg=box_size_deg)
+    # Use negative amplitude to match main.tex: γ̃ = -ℓ₊²Φ̃
+    return generate_spin_field(phi_fourier, -C, ell_power=2, spin=2, nx=nx, ny=ny, box_size_deg=box_size_deg)

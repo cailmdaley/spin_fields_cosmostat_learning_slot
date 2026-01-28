@@ -1,0 +1,171 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.75\baselineskip}
+
+\title{Toy tutorial: vector--shear (spin-1 $\times$ spin-2) correlation functions in TreeCorr}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Motivation and setup}
+We want an observable that cross-correlates:
+\begin{itemize}
+  \item a cosmic shear field $\gamma(\boldsymbol\theta)=\gamma_1+i\gamma_2$, a \emph{spin-2} field; and
+  \item a quasar apparent-motion field $v(\boldsymbol\theta)=v_x+i v_y$, a \emph{spin-1} field (think: proper motion induced by large-scale structure evolution and measured at $\mu$as resolution).
+\end{itemize}
+
+Both fields can be modeled as derivatives of a scalar potential on the sky (toy model):
+\[
+  v \sim \eth\,\Phi,\qquad \gamma \sim \eth\eth\,\Phi,
+\]
+so they are correlated.
+We assume:
+(i) a flat-sky 2D geometry, (ii) statistical homogeneity and isotropy, and (iii) an E-mode-only toy model (no B-modes).
+
+\section{Spin conventions and rotation into the pair frame}
+Write the pair separation as $\boldsymbol r = \boldsymbol\theta_2-\boldsymbol\theta_1$ with polar angle $\varphi$.
+On the flat sky, a global rotation by angle $\alpha$ acts as
+\[
+  v \to v\,e^{i\alpha},\qquad \gamma \to \gamma\,e^{2i\alpha}.
+\]
+
+It is therefore useful to rotate each field into the local frame defined by the separation direction:
+\[
+  v^{\rm rot} \equiv v\,e^{-i\varphi},\qquad
+  \gamma^{\rm rot} \equiv \gamma\,e^{-2i\varphi}.
+\]
+We will also use the real ``radial/tangential'' components for the vector and the usual tangential/cross components for shear:
+\[
+  v_R \equiv -\Re(v^{\rm rot}),\qquad v_T \equiv -\Im(v^{\rm rot}),
+\]
+\[
+  \gamma_t \equiv -\Re(\gamma^{\rm rot}),\qquad \gamma_\times \equiv -\Im(\gamma^{\rm rot}).
+\]
+
+\section{Two invariant vector--shear correlators: $\xi_+$ and $\xi_-$}
+A raw correlator like $\langle v\,\gamma\rangle$ is not rotation-invariant, because it carries net spin.
+The isotropic, real-space cross-correlation is instead captured by \emph{two} complex scalar functions (we will call them $\xi_+$ and $\xi_-$ by analogy with $GG$ and $VV$):
+\begin{align}
+  \xi_+(r)
+  &\equiv \left\langle v(\boldsymbol\theta)\,\gamma^*(\boldsymbol\theta+\boldsymbol r)\,e^{+i\varphi}\right\rangle,\\
+  \xi_-(r)
+  &\equiv \left\langle v(\boldsymbol\theta)\,\gamma(\boldsymbol\theta+\boldsymbol r)\,e^{-3i\varphi}\right\rangle.
+\end{align}
+
+\section{Toy prediction for a power-law potential}
+Assume a flat-sky scalar potential with angular power spectrum
+\[
+  P_\Phi(\ell) = A_\Phi\,\ell^{n},\qquad n=-5.
+\]
+In Fourier space, the (spin-raising) derivative operators contribute powers of $\ell$.
+For our toy model $v\sim\eth\Phi$ and $\gamma\sim\eth\eth\Phi$, the cross-spectrum therefore scales as
+\[
+  P_{v\gamma}(\ell) \propto \ell^{3} P_\Phi(\ell) = A_\Phi\,\ell^{-2}.
+\]
+
+The corresponding real-space invariants are Hankel transforms; for spin-1 $\times$ spin-2, the relevant Bessel orders are $m=1$ and $m=3$:
+\begin{align}
+  \xi_+(r) &= \int_0^\infty \frac{\ell\,d\ell}{2\pi}\,P_{v\gamma}(\ell)\,J_1(\ell r),\\
+  \xi_-(r) &= \int_0^\infty \frac{\ell\,d\ell}{2\pi}\,P_{v\gamma}(\ell)\,J_3(\ell r).
+\end{align}
+Plugging in $P_{v\gamma}(\ell)=A_\Phi\,\ell^{-2}$ gives
+\begin{align}
+  \xi_+(r)
+  &=\frac{A_\Phi}{2\pi}\int_0^\infty d\ell\,\ell^{-1}J_1(\ell r)
+   =\frac{A_\Phi}{2\pi}\int_0^\infty \frac{dx}{x}J_1(x),\\
+  \xi_-(r)
+  &=\frac{A_\Phi}{2\pi}\int_0^\infty d\ell\,\ell^{-1}J_3(\ell r)
+   =\frac{A_\Phi}{2\pi}\int_0^\infty \frac{dx}{x}J_3(x),
+\end{align}
+where we substituted $x\equiv \ell r$; note that $d\ell\,\ell^{-1}=dx\,x^{-1}$ so the result is \emph{independent of $r$} for a pure power law integrated over $(0,\infty)$.
+
+Using the standard integral $\int_0^\infty \frac{dx}{x}J_m(x)=\frac{1}{m}$ for integer $m>0$, we obtain the toy predictions
+\[
+  \boxed{\ \xi_+(r)=\frac{A_\Phi}{2\pi},\qquad
+  \xi_-(r)=\frac{A_\Phi}{6\pi}.\ }
+\]
+In practice, any realistic simulation/measurement has finite $\ell$ support (pixel scale, smoothing, survey window), so the above constants become slowly varying functions of $r$ set by effective IR/UV cutoffs.
+In this E-mode-only toy model (fields derived from a real scalar potential), both correlators are expected to be purely real, so any measured imaginary part provides a useful null test.
+
+\section{Generating correlated mock catalogs ($v$ and $\gamma$)}
+To test the pipeline end-to-end, we can generate correlated realizations of $v$ and $\gamma$ by drawing a Gaussian random potential $\Phi$ on a flat-sky patch and applying Fourier-space derivatives.
+
+\subsection{Field generation on a grid}
+Choose a square patch of side length $L$ (in radians or degrees) with an $N\times N$ grid.
+Define Fourier wavenumbers $\boldsymbol\ell=(\ell_x,\ell_y)$ and draw complex Fourier modes $\tilde\Phi(\boldsymbol\ell)$ with
+\[
+  \langle \tilde\Phi(\boldsymbol\ell)\,\tilde\Phi^*(\boldsymbol\ell')\rangle = (2\pi)^2\,\delta(\boldsymbol\ell-\boldsymbol\ell')\,P_\Phi(\ell),
+  \qquad P_\Phi(\ell)=A_\Phi\,\ell^{-5},
+\]
+with Hermitian symmetry enforced so that $\Phi(\boldsymbol\theta)$ is real after the inverse FFT.
+
+Let $\ell\equiv\sqrt{\ell_x^2+\ell_y^2}$ and define the complex combination $\ell_+\equiv \ell_x+i\ell_y$.
+A convenient flat-sky toy choice consistent with the spin assignment is
+\[
+  \tilde v(\boldsymbol\ell) = i\,\ell_+\,\tilde\Phi(\boldsymbol\ell),
+  \qquad
+  \tilde\gamma(\boldsymbol\ell) = -\,\ell_+^2\,\tilde\Phi(\boldsymbol\ell).
+\]
+Inverse FFT to obtain $v_x(\boldsymbol\theta),v_y(\boldsymbol\theta)$ and $\gamma_1(\boldsymbol\theta),\gamma_2(\boldsymbol\theta)$ on the grid.
+(Overall sign conventions are not important as long as you use them consistently in both the simulation and the correlation estimator.)
+
+\subsection{Sampling a discrete catalog}
+Pick $N_{\rm obj}$ random positions $\boldsymbol\theta_i$ in the patch and interpolate the grid fields to these positions.
+Optionally add shape/noise terms:
+\[
+  v \to v + n_v,\qquad \gamma \to \gamma + n_\gamma,
+\]
+with $n_v$ and $n_\gamma$ drawn from zero-mean Gaussians with your chosen per-object variances.
+
+\subsection{Writing the catalogs for TreeCorr}
+TreeCorr typically ingests catalogs with columns for positions and field components.
+A simple ASCII format is:
+\begin{verbatim}
+# x   y    v1    v2    g1    g2    w
+...
+\end{verbatim}
+where $(x,y)$ are flat-sky coordinates (consistent units), $(v1,v2)=(v_x,v_y)$, $(g1,g2)=(\gamma_1,\gamma_2)$, and $w$ is a weight.
+You can either write one combined catalog with all columns or write separate catalogs for $V$ and $G$ (using the same positions).
+
+\section{How this relates to what TreeCorr already computes}
+TreeCorr already implements a standard set of 2-point correlations (counts $N$, scalars $K$, shears $G$ (spin-2), and vectors $V$ (spin-1)).
+In particular:
+\begin{itemize}
+  \item $GG$ and $VV$ store \emph{two} functions ($\xi_+$ and $\xi_-$): the API exposes \texttt{xip} and \texttt{xim}.
+  \item cross-type correlations like $NG$ and $KG$ store a \emph{single} complex correlation \texttt{xi} plus \texttt{xi\_im}, corresponding to the separation-aligned projection (e.g. $\langle \gamma_t\rangle$ for $NG$).
+\end{itemize}
+
+For a new spin-1 $\times$ spin-2 correlation, the most TreeCorr-native design is to store two invariants analogous to $\xi_+$ and $\xi_-$ (like \texttt{xip/xim} for $VV$ and $GG$).
+
+\section{Sketch of a TreeCorr implementation}
+Goal: implement a 2-point correlation that takes a Vector catalog ($V$; spin-1) and a Shear catalog ($G$; spin-2) and outputs two binned complex arrays, \texttt{xip} and \texttt{xim}, corresponding to $\xi_+(r)$ and $\xi_-(r)$.
+
+A minimal implementation plan:
+\begin{enumerate}
+  \item \textbf{Define the estimator.} For each pair $(i,j)$ with separation angle $\varphi_{ij}$ and weight $w_i w_j$:
+  \[
+    \hat\xi_+(r) = \frac{\sum_{ij\in r} w_i w_j\, v_i\,\gamma_j^*\,e^{+i\varphi_{ij}}}{\sum_{ij\in r} w_i w_j},\qquad
+    \hat\xi_-(r) = \frac{\sum_{ij\in r} w_i w_j\, v_i\,\gamma_j\,e^{-3i\varphi_{ij}}}{\sum_{ij\in r} w_i w_j}.
+  \]
+  (The imaginary parts should be a null test in the E-mode-only toy model.)
+
+  \item \textbf{Add a new correlation class.} Create a new module alongside TreeCorr's existing correlation objects, e.g. \texttt{treecorr/vgcorrelation.py}, defining \texttt{VGCorrelation} (and optionally \texttt{GVCorrelation} as a thin wrapper if ordering matters).
+
+  \item \textbf{Mirror the $VV/GG$ API.} Expose binned arrays \texttt{xip}, \texttt{xim} (and their imaginary parts), plus the standard metadata (\texttt{rnom}, \texttt{meanr}, \texttt{weight}, \texttt{npairs}).
+
+  \item \textbf{Reuse the pair iteration machinery.} Hook into the same binning and tree-walk infrastructure used by other 2pt correlations; the only ``new'' math is the per-pair accumulation of the complex phase factors $e^{+i\varphi}$ and $e^{-3i\varphi}$ multiplying $v\gamma^*$ and $v\gamma$.
+
+  \item \textbf{Add a basic unit test.} Simulate a Gaussian random potential field with $P_\Phi(\ell)\propto \ell^{-5}$ on a grid, construct $v$ and $\gamma$ via Fourier-space derivatives, and verify:
+  (i) $\xi_+(r),\xi_-(r)$ are approximately constant over a mid-range of $r$ (away from the pixel/box-scale cutoffs), (ii) $\xi_+(r)\approx 3\,\xi_-(r)$, and (iii) imaginary parts are consistent with zero.
+\end{enumerate}
+
+\section{Next step for this tutorial}
+Next we can write the estimator in exactly the form TreeCorr expects internally and sketch the class fields/methods (constructor, \texttt{process}, \texttt{finalize}, \texttt{write}).
+
+\end{document}
